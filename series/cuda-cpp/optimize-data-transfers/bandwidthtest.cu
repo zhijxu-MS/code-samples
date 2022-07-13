@@ -89,7 +89,7 @@ void profileCopies(float        *h_a,
 
 int main()
 {
-  unsigned int nElements = 4*1024*1024;
+  unsigned int nElements = 256*1024*1024;
   const unsigned int bytes = nElements * sizeof(float);
 
   // host arrays
@@ -100,36 +100,40 @@ int main()
   float *d_a;
 
   // allocate and initialize
-  h_aPageable = (float*)malloc(bytes);                    // host pageable
-  h_bPageable = (float*)malloc(bytes);                    // host pageable
-  checkCuda( cudaMallocHost((void**)&h_aPinned, bytes) ); // host pinned
-  checkCuda( cudaMallocHost((void**)&h_bPinned, bytes) ); // host pinned
-  checkCuda( cudaMalloc((void**)&d_a, bytes) );           // device
+for (int cnt=0; cnt<10; cnt++){
+    h_aPageable = (float*)malloc(bytes);                    // host pageable
+    h_bPageable = (float*)malloc(bytes);                    // host pageable
+    checkCuda( cudaMallocHost((void**)&h_aPinned, bytes) ); // host pinned
+    checkCuda( cudaMallocHost((void**)&h_bPinned, bytes) ); // host pinned
+    checkCuda( cudaMalloc((void**)&d_a, bytes) );           // device
 
-  for (int i = 0; i < nElements; ++i) h_aPageable[i] = i;
-  memcpy(h_aPinned, h_aPageable, bytes);
-  memset(h_bPageable, 0, bytes);
-  memset(h_bPinned, 0, bytes);
+    checkCuda(cudaDeviceSynchronize());
+    for (int i = 0; i < nElements; ++i) h_aPageable[i] = i;
+    memcpy(h_aPinned, h_aPageable, bytes);
+    memset(h_bPageable, 0, bytes);
+    memset(h_bPinned, 0, bytes);
 
-  // output device info and transfer size
-  cudaDeviceProp prop;
-  checkCuda( cudaGetDeviceProperties(&prop, 0) );
+    // output device info and transfer size
+    cudaDeviceProp prop;
+    checkCuda( cudaGetDeviceProperties(&prop, 0) );
 
-  printf("\nDevice: %s\n", prop.name);
-  printf("Transfer size (MB): %d\n", bytes / (1024 * 1024));
+    printf("\nDevice: %s\n", prop.name);
+    printf("Transfer size (MB): %d\n", bytes / (1024 * 1024));
 
-  // perform copies and report bandwidth
-  profileCopies(h_aPageable, h_bPageable, d_a, nElements, "Pageable");
-  profileCopies(h_aPinned, h_bPinned, d_a, nElements, "Pinned");
+    // perform copies and report bandwidth
+    checkCuda(cudaDeviceSynchronize());
+    profileCopies(h_aPageable, h_bPageable, d_a, nElements, "Pageable");
+    profileCopies(h_aPinned, h_bPinned, d_a, nElements, "Pinned");
+    checkCuda(cudaDeviceSynchronize());
 
-  printf("\n");
+    printf("\ncnt is %d\n", cnt);
 
-  // cleanup
-  cudaFree(d_a);
-  cudaFreeHost(h_aPinned);
-  cudaFreeHost(h_bPinned);
-  free(h_aPageable);
-  free(h_bPageable);
-
+    // cleanup
+    cudaFree(d_a);
+    cudaFreeHost(h_aPinned);
+    cudaFreeHost(h_bPinned);
+    free(h_aPageable);
+    free(h_bPageable);
+}
   return 0;
 }
