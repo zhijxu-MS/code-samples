@@ -27,7 +27,8 @@
 
 #include <stdio.h>
 #include <assert.h>
-
+#include <chrono>
+#include <iostream>
 // Convenience function for checking CUDA runtime API results
 // can be wrapped around any runtime API call. No-op in release builds.
 inline
@@ -41,7 +42,7 @@ cudaError_t checkCuda(cudaError_t result)
 #endif
   return result;
 }
-
+using namespace std;
 void profileCopies(float        *h_a,
                    float        *h_b,
                    float        *d,
@@ -89,7 +90,7 @@ void profileCopies(float        *h_a,
 
 int main()
 {
-  unsigned int nElements = 256*1024*1024;
+  unsigned int nElements = 512*1024*1024;
   const unsigned int bytes = nElements * sizeof(float);
 
   // host arrays
@@ -101,9 +102,12 @@ int main()
 
   // allocate and initialize
 for (int cnt=0; cnt<10; cnt++){
+    auto start = chrono::steady_clock::now();
     h_aPageable = (float*)malloc(bytes);                    // host pageable
+    cout << "malloc pageable time: " << chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - start).count()/1000.0 << "ms" << endl;
     h_bPageable = (float*)malloc(bytes);                    // host pageable
     checkCuda( cudaMallocHost((void**)&h_aPinned, bytes) ); // host pinned
+    cout << "malloc pinned time: " << chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - start).count()/1000.0 << "ms" << endl;
     checkCuda( cudaMallocHost((void**)&h_bPinned, bytes) ); // host pinned
     checkCuda( cudaMalloc((void**)&d_a, bytes) );           // device
 
