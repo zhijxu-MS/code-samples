@@ -42,9 +42,9 @@ cudaError_t checkCuda(cudaError_t result)
   return result;
 }
 
-void profileCopies(float        *h_a, 
-                   float        *h_b, 
-                   float        *d, 
+void profileCopies(float        *h_a,
+                   float        *h_b,
+                   float        *d,
                    unsigned int  n,
                    char         *desc)
 {
@@ -53,11 +53,11 @@ void profileCopies(float        *h_a,
   unsigned int bytes = n * sizeof(float);
 
   // events for timing
-  cudaEvent_t startEvent, stopEvent; 
-  
+  cudaEvent_t startEvent, stopEvent;
+
   checkCuda( cudaEventCreate(&startEvent) );
   checkCuda( cudaEventCreate(&stopEvent) );
-  
+
   checkCuda( cudaEventRecord(startEvent, 0) );
   checkCuda( cudaMemcpy(d, h_a, bytes, cudaMemcpyHostToDevice) );
   checkCuda( cudaEventRecord(stopEvent, 0) );
@@ -93,7 +93,7 @@ int main()
   const unsigned int bytes = nElements * sizeof(float);
 
   // host arrays
-  float *h_aPageable, *h_bPageable;   
+  float *h_aPageable, *h_bPageable;
   float *h_aPinned, *h_bPinned;
 
   // device array
@@ -106,7 +106,7 @@ int main()
   checkCuda( cudaMallocHost((void**)&h_bPinned, bytes) ); // host pinned
   checkCuda( cudaMalloc((void**)&d_a, bytes) );           // device
 
-  for (int i = 0; i < nElements; ++i) h_aPageable[i] = i;      
+  for (int i = 0; i < nElements; ++i) h_aPageable[i] = i;
   memcpy(h_aPinned, h_aPageable, bytes);
   memset(h_bPageable, 0, bytes);
   memset(h_bPinned, 0, bytes);
