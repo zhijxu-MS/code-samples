@@ -29,6 +29,9 @@
 #include <assert.h>
 #include <chrono>
 #include <iostream>
+#include <cstdlib>
+#include <unistd.h>
+#include <mpi.h>
 // Convenience function for checking CUDA runtime API results
 // can be wrapped around any runtime API call. No-op in release builds.
 inline
@@ -73,11 +76,20 @@ void CUDART_CB memcpyHostToHost(void *ptr) {
     // check_accuracy((int*)info->dst, (int*)info->expected, info->bytes/4);
 }
 
-int main()
+int main(int argc, char *argv [])
 {
   size_t nElements = 1024*1024*1024;
   size_t bytes = nElements * sizeof(float);
 
+  // select gpu device
+  // int local_rank = atoi(getenv("OMPI_COMM_WORLD_LOCAL_RANK"));
+  int rank;
+  MPI_Init(&argc, &argv);
+  MPI_Comm comm;
+  comm = MPI_COMM_WORLD;
+  MPI_Comm_rank(comm, &rank);
+  cudaSetDevice(rank);
+  cout << "i am rank " << rank << endl;
   // 2 stream
   int num_streams = 2;
   cudaStream_t streams[num_streams];
@@ -102,7 +114,13 @@ int main()
   memset(h_bPageable, 0, 2*bytes);
   checkCuda( cudaMallocHost((void**)&h_aPinned, bytes) );
   checkCuda( cudaMallocHost((void**)&h_bPinned, 2*bytes) );
+
+  sleep(5); // above work can be done in advance.
+
+
+
   for (int j=0; j<6; j++){
+    auto res = MPI_Barrier (MPI_COMM_WORLD); // make sure all rank are sync, so they can nebula.save at the same time
     //stream 0
     cudaMemcpyAsync(h_aPinned, d_a, bytes, cudaMemcpyDeviceToHost, streams[0]);
     callBackData_t *host_args1 = new callBackData_t;
@@ -112,9 +130,21 @@ int main()
     host_args1->bytes = bytes;
     cudaLaunchHostFunc(streams[0], memcpyHostToHost, host_args1);
     //stream 1
-    cudaMemcpyAsync(h_bPageable, d_a, 2*bytes, cudaMemcpyDeviceToHost, streams[1]);
+    cudaMemcpyAsync(h_bPageable, d_a, 2*bytes, cudaMemcpyDeviceToHost, streams[1]); // actually this async is sync.
+
+    // check accuracy
     checkCuda(cudaDeviceSynchronize());
+    if (memcmp(h_aPageable, h_expected, bytes) != 0 or memcmp(h_bPageable, h_expected, 2*bytes) != 0)
+    {
+       printf("something is wrong, copied data is not same as expected");
+       return -1;
+    }
+    else
+    {
+      printf("copied data is expected!");
+    }
     // cudaMemcpy(h_bPageable, h_bPinned, 2*bytes, cudaMemcpyHostToHost);
+    sleep(10);
     continue;
     callBackData_t *host_args2 = new callBackData_t;
     host_args2->src = (void*)h_bPinned;
@@ -122,6 +152,7 @@ int main()
     host_args2->expected = (void*)h_expected;
     host_args2->bytes = bytes;
     cudaLaunchHostFunc(streams[1], memcpyHostToHost, host_args2);
+
   }
 
     // cleanup
@@ -132,5 +163,6 @@ int main()
     free(h_bPageable);
     free(h_expected);
     printf("finish main function, everyhing is done\n");
+    MPI_Finalize();
   return 0;
 }
