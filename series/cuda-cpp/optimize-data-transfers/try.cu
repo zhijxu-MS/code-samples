@@ -81,7 +81,8 @@ int main(int argc, char *argv [])
   size_t nElements = 1024*1024*1024;
   size_t bytes = nElements * sizeof(float);
 
-  // select gpu device
+  // to xiaoran:  preparation work
+  // select gpu device >> each rank will work on its gpu device, its gpu data, ...
   // int local_rank = atoi(getenv("OMPI_COMM_WORLD_LOCAL_RANK"));
   int rank;
   MPI_Init(&argc, &argv);
@@ -118,7 +119,7 @@ int main(int argc, char *argv [])
   sleep(5); // above work can be done in advance.
 
 
-
+  //to xiaoran:  each loop iteration is a nebula.save
   for (int j=0; j<6; j++){
     auto res = MPI_Barrier (MPI_COMM_WORLD); // make sure all rank are sync, so they can nebula.save at the same time
     //stream 0
@@ -132,7 +133,9 @@ int main(int argc, char *argv [])
     //stream 1
     cudaMemcpyAsync(h_bPageable, d_a, 2*bytes, cudaMemcpyDeviceToHost, streams[1]); // actually this async is sync.
 
+     // to xiaoran:  the following code of the loop is just to check accuracy, it's not necessary to happen in customer's real run
     // check accuracy
+    // memset(h_aPageable, 0, bytes); # if this statement is uncomment, then the following check will be wrong >> just to make sure the check is woking its job
     checkCuda(cudaDeviceSynchronize());
     if (memcmp(h_aPageable, h_expected, bytes) != 0 or memcmp(h_bPageable, h_expected, 2*bytes) != 0)
     {
@@ -144,6 +147,8 @@ int main(int argc, char *argv [])
       printf("copied data is expected!");
     }
     // cudaMemcpy(h_bPageable, h_bPinned, 2*bytes, cudaMemcpyHostToHost);
+    memset(h_aPageable, 0, bytes); // just to make sure later copy is doing their job
+    memset(h_bPageable, 0, 2*bytes);
     sleep(10);
     continue;
     callBackData_t *host_args2 = new callBackData_t;
